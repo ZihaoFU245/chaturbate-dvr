@@ -60,7 +60,7 @@ type Config struct {
 	MaxFilesize   int
 	Port          string
 	Interval      int
-	Cookies       string
-	UserAgent     string
+	Cookies       string `json:"cookies"`
+	UserAgent     string `json:"user_agent"`
 	Domain        string
 }

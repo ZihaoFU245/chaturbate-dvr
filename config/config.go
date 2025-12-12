@@ -7,7 +7,7 @@ import (
 
 // New initializes a new Config struct with values from the CLI context.
 func New(c *cli.Context) (*entity.Config, error) {
-	return &entity.Config{
+	cfg := &entity.Config{
 		Version:       c.App.Version,
 		Username:      c.String("username"),
 		AdminUsername: c.String("admin-username"),
@@ -22,5 +22,9 @@ func New(c *cli.Context) (*entity.Config, error) {
 		Cookies:       c.String("cookies"),
 		UserAgent:     c.String("user-agent"),
 		Domain:        c.String("domain"),
-	}, nil
+	}
+	if err := Load(cfg); err != nil {
+		return nil, err
+	}
+	return cfg, nil
 }
