@@ -13,7 +13,7 @@ A tool to record **multiple** Chaturbate streams. Supports macOS, Windows, Linux
 
 # Getting Started
 
-Go to the [📦 Releases page](https://github.com/teacat/chaturbate-dvr/releases) and download the appropriate binary. (e.g., `x64_windows_chaturbate-dvr.exe`)
+Go to the [📦 Releases page](https://github.com/ZihaoFU245/chaturbate-dvr/releases/) and download the appropriate binary.
 
 &nbsp;
 
@@ -21,10 +21,10 @@ Go to the [📦 Releases page](https://github.com/teacat/chaturbate-dvr/releases
 
 ```bash
 # Windows
-$ x64_windows_chaturbate-dvr.exe
+$ cdvr-v3.0.0-windows-x86_64.exe
 
 # macOS / Linux
-$ ./x64_linux_chaturbate-dvr
+$ ./cdvr-v3.0.0-linux-x86_64
 ```
 
 Then visit [`http://localhost:8080`](http://localhost:8080) in your browser.
@@ -32,6 +32,10 @@ Then visit [`http://localhost:8080`](http://localhost:8080) in your browser.
 &nbsp;
 
 ## 💻 Using as a CLI Tool
+
+> [!NOTE]
+> The CLI have not been tested for v3.0.0 save UserAgent and Coockies feature.
+> CLI usage is not recommended, use web interface
 
 ```bash
 # Windows
@@ -45,9 +49,9 @@ This starts recording immediately. The Web UI will be disabled.
 
 &nbsp;
 
-## 🐳 Running with Docker
+## 🐳 Running with Docker (Preferred)
 
-Pre-built image `yamiodymel/chaturbate-dvr` from [Docker Hub](https://hub.docker.com/r/yamiodymel/chaturbate-dvr):
+Pre-built image `zihaofu245/cdvr` from [Docker Hub](https://hub.docker.com/repository/docker/zihaofu245/cdvr/general):
 
 ```bash
 # Run the container and save videos to ./videos
@@ -56,14 +60,14 @@ $ docker run -d \
     -p 8080:8080 \
     -v "./videos:/usr/src/app/videos" \
     -v "./conf:/usr/src/app/conf" \
-    yamiodymel/chaturbate-dvr
+    zihaofu245/cdvr
 ```
 
 ...Or build your own image using the Dockerfile in this repository.
 
 ```bash
 # Build the image
-$ docker build -t chaturbate-dvr .
+$ docker build -t cdvr .
 
 # Run the container and save videos to ./videos
 $ docker run -d \
@@ -71,13 +75,13 @@ $ docker run -d \
     -p 8080:8080 \
     -v "./videos:/usr/src/app/videos" \
     -v "./conf:/usr/src/app/conf" \
-    chaturbate-dvr
+    cdvr
 ```
 
-...Or use [`docker-compose.yml`](https://github.com/teacat/chaturbate-dvr/blob/master/docker-compose.yml):
+...Or use [`docker-compose.yml`](https://raw.githubusercontent.com/ZihaoFU245/chaturbate-dvr/refs/heads/master/docker-compose.yml):
 
 ```bash
-$ docker-compose up
+$ docker-compose up -d
 ```
 
 Then visit [`http://localhost:8080`](http://localhost:8080) in your browser.
@@ -254,3 +258,10 @@ _Note: Files are saved in `.ts` format, and this is not configurable._
 > ```bash
 > $ HTTPS_PROXY="socks5://127.0.0.1:9050" ./chaturbate-dvr -u CHANNEL_USERNAME
 > ```
+
+# Extra
+
+You would want to run this application 24/7 for it's full capability, the docker container method with a tiny VM will shine its true power. Deploy on your homelab, rasberrypi, Cloud VM or whatever, and with tailscale, any VPN, to control from anywhere.
+
+> [!NOTE]
+> Remember to always check the `videos` folder, if you record many channels, space will bloat up very quickly
