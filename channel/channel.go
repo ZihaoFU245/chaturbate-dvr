@@ -7,9 +7,9 @@ import (
 	"os"
 	"time"
 
-	"github.com/teacat/chaturbate-dvr/entity"
-	"github.com/teacat/chaturbate-dvr/internal"
-	"github.com/teacat/chaturbate-dvr/server"
+	"github.com/zihaofu245/chaturbate-dvr/entity"
+	"github.com/zihaofu245/chaturbate-dvr/internal"
+	"github.com/zihaofu245/chaturbate-dvr/server"
 )
 
 // Channel represents a channel instance.

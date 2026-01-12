@@ -222,7 +222,7 @@ _Note: Files are saved in `.ts` format, and this is not configurable._
 
 **Q: The program closes immediately on Windows.**
 
-> Open it via **Command Prompt**, the error message should appear. If needed, [create an issue](https://github.com/teacat/chaturbate-dvr/issues).
+> Open it via **Command Prompt**, the error message should appear. If needed, [create an issue](https://github.com/zihaofu245/chaturbate-dvr/issues).
 
 &nbsp;
 

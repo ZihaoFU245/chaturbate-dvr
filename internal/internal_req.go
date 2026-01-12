@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/teacat/chaturbate-dvr/server"
+	"github.com/zihaofu245/chaturbate-dvr/server"
 )
 
 // Req represents an HTTP client with customized settings.

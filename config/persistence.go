@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/teacat/chaturbate-dvr/entity"
+	"github.com/zihaofu245/chaturbate-dvr/entity"
 )
 
 const configPath = "./conf/config.json"

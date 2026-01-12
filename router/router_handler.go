@@ -7,9 +7,9 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/teacat/chaturbate-dvr/config"
-	"github.com/teacat/chaturbate-dvr/entity"
-	"github.com/teacat/chaturbate-dvr/server"
+	"github.com/zihaofu245/chaturbate-dvr/config"
+	"github.com/zihaofu245/chaturbate-dvr/entity"
+	"github.com/zihaofu245/chaturbate-dvr/server"
 )
 
 // IndexData represents the data structure for the index page.

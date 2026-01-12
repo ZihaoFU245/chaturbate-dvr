@@ -5,12 +5,12 @@ import (
 	"log"
 	"os"
 
-	"github.com/teacat/chaturbate-dvr/config"
-	"github.com/teacat/chaturbate-dvr/entity"
-	"github.com/teacat/chaturbate-dvr/manager"
-	"github.com/teacat/chaturbate-dvr/router"
-	"github.com/teacat/chaturbate-dvr/server"
 	"github.com/urfave/cli/v2"
+	"github.com/zihaofu245/chaturbate-dvr/config"
+	"github.com/zihaofu245/chaturbate-dvr/entity"
+	"github.com/zihaofu245/chaturbate-dvr/manager"
+	"github.com/zihaofu245/chaturbate-dvr/router"
+	"github.com/zihaofu245/chaturbate-dvr/server"
 )
 
 const logo = `

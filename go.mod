@@ -1,4 +1,4 @@
-module github.com/teacat/chaturbate-dvr
+module github.com/zihaofu245/chaturbate-dvr
 
 go 1.24.0
 

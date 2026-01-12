@@ -11,9 +11,9 @@ import (
 	"sync"
 
 	"github.com/r3labs/sse/v2"
-	"github.com/teacat/chaturbate-dvr/channel"
-	"github.com/teacat/chaturbate-dvr/entity"
-	"github.com/teacat/chaturbate-dvr/router/view"
+	"github.com/zihaofu245/chaturbate-dvr/channel"
+	"github.com/zihaofu245/chaturbate-dvr/entity"
+	"github.com/zihaofu245/chaturbate-dvr/router/view"
 )
 
 // Manager is responsible for managing channels and their states.

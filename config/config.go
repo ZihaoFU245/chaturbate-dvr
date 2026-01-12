@@ -1,8 +1,8 @@
 package config
 
 import (
-	"github.com/teacat/chaturbate-dvr/entity"
 	"github.com/urfave/cli/v2"
+	"github.com/zihaofu245/chaturbate-dvr/entity"
 )
 
 // New initializes a new Config struct with values from the CLI context.

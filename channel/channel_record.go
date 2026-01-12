@@ -7,9 +7,9 @@ import (
 	"time"
 
 	"github.com/avast/retry-go/v4"
-	"github.com/teacat/chaturbate-dvr/chaturbate"
-	"github.com/teacat/chaturbate-dvr/internal"
-	"github.com/teacat/chaturbate-dvr/server"
+	"github.com/zihaofu245/chaturbate-dvr/chaturbate"
+	"github.com/zihaofu245/chaturbate-dvr/internal"
+	"github.com/zihaofu245/chaturbate-dvr/server"
 )
 
 // Monitor starts monitoring the channel for live streams and records them.

@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 
 	"github.com/gin-gonic/gin"
-	"github.com/teacat/chaturbate-dvr/router/view"
-	"github.com/teacat/chaturbate-dvr/server"
+	"github.com/zihaofu245/chaturbate-dvr/router/view"
+	"github.com/zihaofu245/chaturbate-dvr/server"
 )
 
 // SetupRouter initializes and returns the Gin router.

@@ -3,7 +3,7 @@ package server
 import (
 	"net/http"
 
-	"github.com/teacat/chaturbate-dvr/entity"
+	"github.com/zihaofu245/chaturbate-dvr/entity"
 )
 
 var Manager IManager
