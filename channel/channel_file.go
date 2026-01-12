@@ -9,8 +9,49 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 )
+
+var (
+	ffmpegBestVideoEncoder       string
+	ffmpegDetectVideoEncoderOnce sync.Once
+)
+
+func detectBestFFmpegVideoEncoder() string {
+	// Prefer software encoders to avoid needing special hwaccel flags.
+	// Order is important: AV1 first, then H.265, then H.264.
+	preferred := []string{
+		"libsvtav1",
+		"libaom-av1",
+		"librav1e",
+		"libx265",
+		"libx264",
+	}
+
+	out, err := exec.Command("ffmpeg", "-hide_banner", "-encoders").CombinedOutput()
+	if err != nil {
+		return ""
+	}
+	encoders := string(out)
+
+	for _, enc := range preferred {
+		// ffmpeg prints one encoder per line; a simple substring match is enough.
+		// Typical format: " V..... libx264 ..."
+		if strings.Contains(encoders, " "+enc+" ") || strings.Contains(encoders, "\t"+enc+" ") {
+			return enc
+		}
+	}
+
+	return ""
+}
+
+func getBestFFmpegVideoEncoder() string {
+	ffmpegDetectVideoEncoderOnce.Do(func() {
+		ffmpegBestVideoEncoder = detectBestFFmpegVideoEncoder()
+	})
+	return ffmpegBestVideoEncoder
+}
 
 // Pattern holds the date/time and sequence information for the filename pattern
 type Pattern struct {
@@ -144,13 +185,74 @@ func (ch *Channel) convertToMP4(tsPath string) {
 	ch.Info("converting %s to mp4", filepath.Base(tsPath))
 
 	var stderr bytes.Buffer
-	cmd := exec.Command("ffmpeg", "-y", "-i", tsPath, "-c", "copy", mp4Path)
-	cmd.Stderr = &stderr
+	encoder := getBestFFmpegVideoEncoder()
+	var cmd *exec.Cmd
+	if encoder != "" {
+		ch.Info("using ffmpeg video encoder: %s", encoder)
+		cmd = exec.Command(
+			"ffmpeg",
+			"-y",
+			"-i", tsPath,
+			"-map", "0:v:0",
+			"-map", "0:a?",
+			"-c:v", encoder,
+			"-pix_fmt", "yuv420p",
+			"-c:a", "copy",
+			"-movflags", "+faststart",
+			mp4Path,
+		)
+	} else {
+		// If ffmpeg is present but no preferred encoder exists, keep old behavior.
+		ch.Info("no preferred ffmpeg encoder found; falling back to stream copy")
+		cmd = exec.Command("ffmpeg", "-y", "-i", tsPath, "-c", "copy", mp4Path)
+	}
 
+	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {
-		ch.Error("convert to mp4 failed: %s (%s)", err.Error(), strings.TrimSpace(stderr.String()))
+		// If we selected an encoder and it fails (e.g., encoder missing in PATH build),
+		// fall back according to AV1 -> H265 -> H264 order.
+		trimmed := strings.TrimSpace(stderr.String())
+		if encoder != "" {
+			ch.Error("convert with %s failed: %s (%s)", encoder, err.Error(), trimmed)
+			fallbackOrder := [][]string{{"libsvtav1", "libaom-av1", "librav1e"}, {"libx265"}, {"libx264"}}
+			for _, group := range fallbackOrder {
+				for _, enc := range group {
+					if enc == encoder {
+						continue
+					}
+					var attemptStderr bytes.Buffer
+					attempt := exec.Command(
+						"ffmpeg",
+						"-y",
+						"-i", tsPath,
+						"-map", "0:v:0",
+						"-map", "0:a?",
+						"-c:v", enc,
+						"-pix_fmt", "yuv420p",
+						"-c:a", "copy",
+						"-movflags", "+faststart",
+						mp4Path,
+					)
+					attempt.Stderr = &attemptStderr
+					runErr := attempt.Run()
+					if runErr == nil {
+						ch.Info("converted using fallback encoder: %s", enc)
+						goto converted
+					}
+					ch.Error(
+						"fallback convert with %s failed: %s (%s)",
+						enc,
+						runErr.Error(),
+						strings.TrimSpace(attemptStderr.String()),
+					)
+				}
+			}
+		}
+		ch.Error("convert to mp4 failed: %s (%s)", err.Error(), trimmed)
 		return
 	}
+
+converted:
 
 	if err := os.Remove(tsPath); err != nil {
 		ch.Error("remove ts after conversion failed: %s", err.Error())
