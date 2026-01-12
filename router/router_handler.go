@@ -28,12 +28,13 @@ func Index(c *gin.Context) {
 
 // CreateChannelRequest represents the request body for creating a channel.
 type CreateChannelRequest struct {
-	Username    string `form:"username" binding:"required"`
-	Framerate   int    `form:"framerate" binding:"required"`
-	Resolution  int    `form:"resolution" binding:"required"`
-	Pattern     string `form:"pattern" binding:"required"`
-	MaxDuration int    `form:"max_duration"`
-	MaxFilesize int    `form:"max_filesize"`
+	Username     string `form:"username" binding:"required"`
+	Framerate    int    `form:"framerate" binding:"required"`
+	Resolution   int    `form:"resolution" binding:"required"`
+	Pattern      string `form:"pattern" binding:"required"`
+	MaxDuration  int    `form:"max_duration"`
+	MaxFilesize  int    `form:"max_filesize"`
+	ConvertToMP4 bool   `form:"convert_to_mp4"`
 }
 
 // CreateChannel creates a new channel.
@@ -46,14 +47,15 @@ func CreateChannel(c *gin.Context) {
 
 	for _, username := range strings.Split(req.Username, ",") {
 		server.Manager.CreateChannel(&entity.ChannelConfig{
-			IsPaused:    false,
-			Username:    username,
-			Framerate:   req.Framerate,
-			Resolution:  req.Resolution,
-			Pattern:     req.Pattern,
-			MaxDuration: req.MaxDuration,
-			MaxFilesize: req.MaxFilesize,
-			CreatedAt:   time.Now().Unix(),
+			IsPaused:     false,
+			Username:     username,
+			Framerate:    req.Framerate,
+			Resolution:   req.Resolution,
+			Pattern:      req.Pattern,
+			MaxDuration:  req.MaxDuration,
+			MaxFilesize:  req.MaxFilesize,
+			ConvertToMP4: req.ConvertToMP4,
+			CreatedAt:    time.Now().Unix(),
 		}, true)
 	}
 	c.Redirect(http.StatusFound, "/")
@@ -87,8 +89,9 @@ func Updates(c *gin.Context) {
 
 // UpdateConfigRequest represents the request body for updating configuration.
 type UpdateConfigRequest struct {
-	Cookies   string `form:"cookies"`
-	UserAgent string `form:"user_agent"`
+	Cookies      string `form:"cookies"`
+	UserAgent    string `form:"user_agent"`
+	ConvertToMP4 bool   `form:"convert_to_mp4"`
 }
 
 // UpdateConfig updates the server configuration.
@@ -101,6 +104,7 @@ func UpdateConfig(c *gin.Context) {
 
 	server.Config.Cookies = req.Cookies
 	server.Config.UserAgent = req.UserAgent
+	server.Config.ConvertToMP4 = req.ConvertToMP4
 
 	if err := config.Save(server.Config); err != nil {
 		c.AbortWithError(http.StatusInternalServerError, fmt.Errorf("save config: %w", err))

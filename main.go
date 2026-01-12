@@ -30,7 +30,7 @@ const logo = `
 func main() {
 	app := &cli.App{
 		Name:    "chaturbate-dvr",
-		Version: "3.0.0",
+		Version: "3.0.1",
 		Usage:   "Record your favorite Chaturbate streams automatically. 😎🫵",
 		Flags: []cli.Flag{
 			&cli.StringFlag{
@@ -73,6 +73,11 @@ func main() {
 				Name:  "max-filesize",
 				Usage: "Split video into segments every N MB ('0' to disable)",
 				Value: 0,
+			},
+			&cli.BoolFlag{
+				Name:  "convert-mp4",
+				Usage: "Convert finished .ts files to .mp4 and delete the .ts after a successful conversion",
+				Value: false,
 			},
 			&cli.StringFlag{
 				Name:    "port",
@@ -134,13 +139,14 @@ func start(c *cli.Context) error {
 
 	// else create a channel with the provided username
 	if err := server.Manager.CreateChannel(&entity.ChannelConfig{
-		IsPaused:    false,
-		Username:    c.String("username"),
-		Framerate:   c.Int("framerate"),
-		Resolution:  c.Int("resolution"),
-		Pattern:     c.String("pattern"),
-		MaxDuration: c.Int("max-duration"),
-		MaxFilesize: c.Int("max-filesize"),
+		IsPaused:     false,
+		Username:     c.String("username"),
+		Framerate:    c.Int("framerate"),
+		Resolution:   c.Int("resolution"),
+		Pattern:      c.String("pattern"),
+		MaxDuration:  c.Int("max-duration"),
+		MaxFilesize:  c.Int("max-filesize"),
+		ConvertToMP4: c.Bool("convert-mp4"),
 	}, false); err != nil {
 		return fmt.Errorf("create channel: %w", err)
 	}

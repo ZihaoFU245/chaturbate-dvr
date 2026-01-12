@@ -15,14 +15,15 @@ const (
 
 // ChannelConfig represents the configuration for a channel.
 type ChannelConfig struct {
-	IsPaused    bool   `json:"is_paused"`
-	Username    string `json:"username"`
-	Framerate   int    `json:"framerate"`
-	Resolution  int    `json:"resolution"`
-	Pattern     string `json:"pattern"`
-	MaxDuration int    `json:"max_duration"`
-	MaxFilesize int    `json:"max_filesize"`
-	CreatedAt   int64  `json:"created_at"`
+	IsPaused     bool   `json:"is_paused"`
+	Username     string `json:"username"`
+	Framerate    int    `json:"framerate"`
+	Resolution   int    `json:"resolution"`
+	Pattern      string `json:"pattern"`
+	MaxDuration  int    `json:"max_duration"`
+	MaxFilesize  int    `json:"max_filesize"`
+	ConvertToMP4 bool   `json:"convert_to_mp4"`
+	CreatedAt    int64  `json:"created_at"`
 }
 
 func (c *ChannelConfig) Sanitize() {
@@ -58,6 +59,7 @@ type Config struct {
 	Pattern       string
 	MaxDuration   int
 	MaxFilesize   int
+	ConvertToMP4  bool
 	Port          string
 	Interval      int
 	Cookies       string `json:"cookies"`
