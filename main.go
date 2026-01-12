@@ -74,6 +74,11 @@ func main() {
 				Usage: "Split video into segments every N MB ('0' to disable)",
 				Value: 0,
 			},
+			&cli.BoolFlag{
+				Name:  "convert-mp4",
+				Usage: "Convert finished .ts files to .mp4 and delete the .ts after a successful conversion",
+				Value: false,
+			},
 			&cli.StringFlag{
 				Name:    "port",
 				Aliases: []string{"p"},
@@ -134,13 +139,14 @@ func start(c *cli.Context) error {
 
 	// else create a channel with the provided username
 	if err := server.Manager.CreateChannel(&entity.ChannelConfig{
-		IsPaused:    false,
-		Username:    c.String("username"),
-		Framerate:   c.Int("framerate"),
-		Resolution:  c.Int("resolution"),
-		Pattern:     c.String("pattern"),
-		MaxDuration: c.Int("max-duration"),
-		MaxFilesize: c.Int("max-filesize"),
+		IsPaused:     false,
+		Username:     c.String("username"),
+		Framerate:    c.Int("framerate"),
+		Resolution:   c.Int("resolution"),
+		Pattern:      c.String("pattern"),
+		MaxDuration:  c.Int("max-duration"),
+		MaxFilesize:  c.Int("max-filesize"),
+		ConvertToMP4: c.Bool("convert-mp4"),
 	}, false); err != nil {
 		return fmt.Errorf("create channel: %w", err)
 	}

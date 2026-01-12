@@ -101,6 +101,7 @@ Available options:
 --pattern value             Template for naming recorded videos (default: "videos/{{.Username}}_{{.Year}}-{{.Month}}-{{.Day}}_{{.Hour}}-{{.Minute}}-{{.Second}}{{if .Sequence}}_{{.Sequence}}{{end}}")
 --max-duration value        Split video into segments every N minutes ('0' to disable) (default: 0)
 --max-filesize value        Split video into segments every N MB ('0' to disable) (default: 0)
+--convert-mp4               Convert finished .ts files to .mp4 and delete the .ts on success (default: false)
 --port value, -p value      Port for the web interface and API (default: "8080")
 --interval value            Check if the channel is online every N minutes (default: 1)
 --cookies value             Cookies to use in the request (format: key=value; key2=value2)
@@ -214,7 +215,7 @@ Pattern: video/{{.Username}}/{{.Year}}-{{.Month}}-{{.Day}}_{{.Hour}}-{{.Minute}}
  Output: video/yamiodymel/2024-01-02_13-45-00_0.ts
 ```
 
-_Note: Files are saved in `.ts` format, and this is not configurable._
+_Note: Files are saved in `.ts` format by default; enable `--convert-mp4` to automatically create an `.mp4` copy and remove the original when conversion succeeds._
 
 &nbsp;
 

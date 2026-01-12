@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"html/template"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -59,6 +61,7 @@ func (ch *Channel) Cleanup() error {
 	if err := ch.File.Close(); err != nil && !errors.Is(err, os.ErrClosed) {
 		return fmt.Errorf("close file: %w", err)
 	}
+	ch.File = nil
 
 	// Delete the empty file
 	fileInfo, err := os.Stat(filename)
@@ -69,6 +72,10 @@ func (ch *Channel) Cleanup() error {
 		if err := os.Remove(filename); err != nil {
 			return fmt.Errorf("remove zero file: %w", err)
 		}
+	}
+
+	if ch.Config.ConvertToMP4 && fileInfo != nil && fileInfo.Size() > 0 {
+		go ch.convertToMP4(filename)
 	}
 	return nil
 }
@@ -127,4 +134,28 @@ func (ch *Channel) ShouldSwitchFile() bool {
 
 	return (ch.Duration >= float64(maxDurationSeconds) && ch.Config.MaxDuration > 0) ||
 		(ch.Filesize >= maxFilesizeBytes && ch.Config.MaxFilesize > 0)
+}
+
+// convertToMP4 converts a recorded .ts file to .mp4 using ffmpeg.
+// Runs in a goroutine to avoid blocking the recording loop.
+func (ch *Channel) convertToMP4(tsPath string) {
+	mp4Path := strings.TrimSuffix(tsPath, filepath.Ext(tsPath)) + ".mp4"
+
+	ch.Info("converting %s to mp4", filepath.Base(tsPath))
+
+	var stderr bytes.Buffer
+	cmd := exec.Command("ffmpeg", "-y", "-i", tsPath, "-c", "copy", mp4Path)
+	cmd.Stderr = &stderr
+
+	if err := cmd.Run(); err != nil {
+		ch.Error("convert to mp4 failed: %s (%s)", err.Error(), strings.TrimSpace(stderr.String()))
+		return
+	}
+
+	if err := os.Remove(tsPath); err != nil {
+		ch.Error("remove ts after conversion failed: %s", err.Error())
+		return
+	}
+
+	ch.Info("converted to mp4: %s", filepath.Base(mp4Path))
 }

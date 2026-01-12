@@ -12,15 +12,17 @@ import (
 const configPath = "./conf/config.json"
 
 type persistentConfig struct {
-	Cookies   string `json:"cookies"`
-	UserAgent string `json:"user_agent"`
+	Cookies             string `json:"cookies"`
+	UserAgent           string `json:"user_agent"`
+	DefaultConvertToMP4 bool   `json:"default_convert_to_mp4"`
 }
 
 // Save persists the UserAgent and Cookies to a JSON file.
 func Save(cfg *entity.Config) error {
 	pCfg := persistentConfig{
-		Cookies:   cfg.Cookies,
-		UserAgent: cfg.UserAgent,
+		Cookies:             cfg.Cookies,
+		UserAgent:           cfg.UserAgent,
+		DefaultConvertToMP4: cfg.ConvertToMP4,
 	}
 	b, err := json.MarshalIndent(pCfg, "", "  ")
 	if err != nil {
@@ -55,6 +57,9 @@ func Load(cfg *entity.Config) error {
 	}
 	if cfg.UserAgent == "" && pCfg.UserAgent != "" {
 		cfg.UserAgent = pCfg.UserAgent
+	}
+	if !cfg.ConvertToMP4 && pCfg.DefaultConvertToMP4 {
+		cfg.ConvertToMP4 = true
 	}
 	return nil
 }

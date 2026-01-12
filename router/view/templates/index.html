@@ -137,6 +137,19 @@
                             </div>
                         </div>
                         <!-- / User Agent -->
+
+                        <!-- Default Convert to MP4 -->
+                        <div class="ts-control is-wide has-top-spaced-large">
+                            <div class="label">Auto MP4 convert</div>
+                            <div class="content">
+                                <label class="ts-switch">
+                                    <input type="checkbox" name="convert_to_mp4" value="true" {{ if .Config.ConvertToMP4 }}checked{{ end }} />
+                                    Enable automatic .mp4 conversion for new channels
+                                </label>
+                                <div class="ts-text is-description has-top-spaced-small">When enabled, new channels default to converting finished .ts files to .mp4 and deleting the .ts after success. You can still override this per channel.</div>
+                            </div>
+                        </div>
+                        <!-- / Default Convert to MP4 -->
                     </div>
 
                     <div class="ts-divider"></div>
@@ -239,6 +252,18 @@
                             </div>
                         </div>
                         <!-- / Filename Pattern -->
+
+                        <!-- Convert to MP4 -->
+                        <div class="ts-control is-wide has-top-spaced-large">
+                            <div class="label">Convert to MP4</div>
+                            <div class="content">
+                                <label class="ts-switch">
+                                    <input type="checkbox" name="convert_to_mp4" value="true" {{ if .Config.ConvertToMP4 }}checked{{ end }} />
+                                    Convert finished .ts files to .mp4 and delete .ts
+                                </label>
+                            </div>
+                        </div>
+                        <!-- / Convert to MP4 -->
 
                         <div class="ts-divider has-vertically-spaced-large"></div>
 

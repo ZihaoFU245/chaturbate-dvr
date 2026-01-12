@@ -17,6 +17,7 @@ func New(c *cli.Context) (*entity.Config, error) {
 		Pattern:       c.String("pattern"),
 		MaxDuration:   c.Int("max-duration"),
 		MaxFilesize:   c.Int("max-filesize"),
+		ConvertToMP4:  c.Bool("convert-mp4"),
 		Port:          c.String("port"),
 		Interval:      c.Int("interval"),
 		Cookies:       c.String("cookies"),
