@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 )
 
@@ -110,7 +111,7 @@ func (ch *Channel) Cleanup() error {
 		return fmt.Errorf("stat file delete zero file: %w", err)
 	}
 	if fileInfo != nil && fileInfo.Size() == 0 {
-		if err := os.Remove(filename); err != nil {
+		if err := removeFileWithRetry(filename, 3, 250*time.Millisecond); err != nil {
 			return fmt.Errorf("remove zero file: %w", err)
 		}
 	}
@@ -254,10 +255,42 @@ func (ch *Channel) convertToMP4(tsPath string) {
 
 converted:
 
-	if err := os.Remove(tsPath); err != nil {
+	if err := removeFileWithRetry(tsPath, 4, 250*time.Millisecond); err != nil {
 		ch.Error("remove ts after conversion failed: %s", err.Error())
 		return
 	}
 
 	ch.Info("converted to mp4: %s", filepath.Base(mp4Path))
+}
+
+func removeFileWithRetry(path string, attempts int, baseDelay time.Duration) error {
+	if attempts <= 0 {
+		attempts = 1
+	}
+	if baseDelay <= 0 {
+		baseDelay = 100 * time.Millisecond
+	}
+
+	// Best-effort: on Docker Desktop bind mounts (especially on Windows hosts), files can
+	// sometimes appear “protected” until the writer fully releases handles/metadata.
+	// Clearing write bits can also help when the mount maps read-only attributes.
+	_ = os.Chmod(path, 0666)
+
+	var lastErr error
+	for i := 0; i < attempts; i++ {
+		err := os.Remove(path)
+		if err == nil || os.IsNotExist(err) {
+			return nil
+		}
+		lastErr = err
+
+		// Retry only on common transient errors.
+		if errors.Is(err, syscall.EPERM) || errors.Is(err, syscall.EACCES) || errors.Is(err, syscall.EBUSY) || errors.Is(err, syscall.ETXTBSY) {
+			_ = os.Chmod(path, 0666)
+			time.Sleep(baseDelay * time.Duration(i+1))
+			continue
+		}
+		return err
+	}
+	return lastErr
 }
