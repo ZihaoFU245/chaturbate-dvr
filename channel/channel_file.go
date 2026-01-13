@@ -2,6 +2,7 @@ package channel
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"html/template"
@@ -30,7 +31,9 @@ func detectBestFFmpegVideoEncoder() string {
 		"libx264",
 	}
 
-	out, err := exec.Command("ffmpeg", "-hide_banner", "-encoders").CombinedOutput()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	out, err := exec.CommandContext(ctx, "ffmpeg", "-hide_banner", "-encoders").CombinedOutput()
 	if err != nil {
 		return ""
 	}
@@ -117,7 +120,7 @@ func (ch *Channel) Cleanup() error {
 	}
 
 	if ch.Config.ConvertToMP4 && fileInfo != nil && fileInfo.Size() > 0 {
-		go ch.convertToMP4(filename)
+		go ch.convertToMP4(ch.Context(), filename)
 	}
 	return nil
 }
@@ -180,7 +183,7 @@ func (ch *Channel) ShouldSwitchFile() bool {
 
 // convertToMP4 converts a recorded .ts file to .mp4 using ffmpeg.
 // Runs in a goroutine to avoid blocking the recording loop.
-func (ch *Channel) convertToMP4(tsPath string) {
+func (ch *Channel) convertToMP4(ctx context.Context, tsPath string) {
 	mp4Path := strings.TrimSuffix(tsPath, filepath.Ext(tsPath)) + ".mp4"
 
 	ch.Info("converting %s to mp4", filepath.Base(tsPath))
@@ -190,7 +193,7 @@ func (ch *Channel) convertToMP4(tsPath string) {
 	var cmd *exec.Cmd
 	if encoder != "" {
 		ch.Info("using ffmpeg video encoder: %s", encoder)
-		cmd = exec.Command(
+		cmd = ffmpegCommand(ctx,
 			"ffmpeg",
 			"-y",
 			"-i", tsPath,
@@ -205,11 +208,15 @@ func (ch *Channel) convertToMP4(tsPath string) {
 	} else {
 		// If ffmpeg is present but no preferred encoder exists, keep old behavior.
 		ch.Info("no preferred ffmpeg encoder found; falling back to stream copy")
-		cmd = exec.Command("ffmpeg", "-y", "-i", tsPath, "-c", "copy", mp4Path)
+		cmd = ffmpegCommand(ctx, "ffmpeg", "-y", "-i", tsPath, "-c", "copy", mp4Path)
 	}
 
 	cmd.Stderr = &stderr
-	if err := cmd.Run(); err != nil {
+	if err := runCmdWithContext(ctx, cmd); err != nil {
+		if ctx.Err() != nil {
+			ch.Info("mp4 conversion cancelled: %s", filepath.Base(tsPath))
+			return
+		}
 		// If we selected an encoder and it fails (e.g., encoder missing in PATH build),
 		// fall back according to AV1 -> H265 -> H264 order.
 		trimmed := strings.TrimSpace(stderr.String())
@@ -222,7 +229,7 @@ func (ch *Channel) convertToMP4(tsPath string) {
 						continue
 					}
 					var attemptStderr bytes.Buffer
-					attempt := exec.Command(
+					attempt := ffmpegCommand(ctx,
 						"ffmpeg",
 						"-y",
 						"-i", tsPath,
@@ -235,7 +242,11 @@ func (ch *Channel) convertToMP4(tsPath string) {
 						mp4Path,
 					)
 					attempt.Stderr = &attemptStderr
-					runErr := attempt.Run()
+					runErr := runCmdWithContext(ctx, attempt)
+					if ctx.Err() != nil {
+						ch.Info("mp4 conversion cancelled: %s", filepath.Base(tsPath))
+						return
+					}
 					if runErr == nil {
 						ch.Info("converted using fallback encoder: %s", enc)
 						goto converted
@@ -293,4 +304,26 @@ func removeFileWithRetry(path string, attempts int, baseDelay time.Duration) err
 		return err
 	}
 	return lastErr
+}
+
+// runCmdWithContext starts cmd, waits, and on ctx cancellation attempts to terminate the process tree.
+func runCmdWithContext(ctx context.Context, cmd *exec.Cmd) error {
+	if err := cmd.Start(); err != nil {
+		return err
+	}
+
+	done := make(chan error, 1)
+	go func() { done <- cmd.Wait() }()
+
+	select {
+	case err := <-done:
+		return err
+	case <-ctx.Done():
+		killErr := terminateProcess(cmd)
+		<-done
+		if killErr != nil {
+			return killErr
+		}
+		return ctx.Err()
+	}
 }

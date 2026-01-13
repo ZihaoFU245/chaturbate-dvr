@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/zihaofu245/chaturbate-dvr/entity"
@@ -17,6 +18,9 @@ type Channel struct {
 	CancelFunc context.CancelFunc
 	LogCh      chan string
 	UpdateCh   chan bool
+
+	ctxMu sync.RWMutex
+	ctx   context.Context
 
 	IsOnline   bool
 	StreamedAt int64
@@ -37,6 +41,7 @@ func New(conf *entity.ChannelConfig) *Channel {
 		UpdateCh:   make(chan bool),
 		Config:     conf,
 		CancelFunc: func() {},
+		ctx:        context.Background(),
 	}
 	go ch.Publisher()
 
@@ -68,7 +73,23 @@ func (ch *Channel) Publisher() {
 // This is used to cancel the context when the channel is stopped or paused.
 func (ch *Channel) WithCancel(ctx context.Context) (context.Context, context.CancelFunc) {
 	ctx, ch.CancelFunc = context.WithCancel(ctx)
+	ch.ctxMu.Lock()
+	ch.ctx = ctx
+	ch.ctxMu.Unlock()
 	return ctx, ch.CancelFunc
+}
+
+// Context returns the channel's current lifecycle context.
+// Background work (e.g. mp4 conversion) should use this so it can be cancelled
+// when the channel is paused/stopped.
+func (ch *Channel) Context() context.Context {
+	ch.ctxMu.RLock()
+	ctx := ch.ctx
+	ch.ctxMu.RUnlock()
+	if ctx == nil {
+		return context.Background()
+	}
+	return ctx
 }
 
 // Info logs an informational message.
