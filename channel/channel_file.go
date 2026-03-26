@@ -21,15 +21,8 @@ var (
 )
 
 func detectBestFFmpegVideoEncoder() string {
-	// Prefer software encoders to avoid needing special hwaccel flags.
-	// Order is important: AV1 first, then H.265, then H.264.
-	preferred := []string{
-		"libsvtav1",
-		"libaom-av1",
-		"librav1e",
-		"libx265",
-		"libx264",
-	}
+	// Prefer software encoding with H.264 for broad compatibility.
+	preferred := []string{"libx264"}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -217,47 +210,22 @@ func (ch *Channel) convertToMP4(ctx context.Context, tsPath string) {
 			ch.Info("mp4 conversion cancelled: %s", filepath.Base(tsPath))
 			return
 		}
-		// If we selected an encoder and it fails (e.g., encoder missing in PATH build),
-		// fall back according to AV1 -> H265 -> H264 order.
+		// If the preferred encoder fails (e.g., encoder missing in PATH build),
+		// fall back to stream copy below.
 		trimmed := strings.TrimSpace(stderr.String())
 		if encoder != "" {
 			ch.Error("convert with %s failed: %s (%s)", encoder, err.Error(), trimmed)
-			fallbackOrder := [][]string{{"libsvtav1", "libaom-av1", "librav1e"}, {"libx265"}, {"libx264"}}
-			for _, group := range fallbackOrder {
-				for _, enc := range group {
-					if enc == encoder {
-						continue
-					}
-					var attemptStderr bytes.Buffer
-					attempt := ffmpegCommand(ctx,
-						"ffmpeg",
-						"-y",
-						"-i", tsPath,
-						"-map", "0:v:0",
-						"-map", "0:a?",
-						"-c:v", enc,
-						"-pix_fmt", "yuv420p",
-						"-c:a", "copy",
-						"-movflags", "+faststart",
-						mp4Path,
-					)
-					attempt.Stderr = &attemptStderr
-					runErr := runCmdWithContext(ctx, attempt)
-					if ctx.Err() != nil {
-						ch.Info("mp4 conversion cancelled: %s", filepath.Base(tsPath))
-						return
-					}
-					if runErr == nil {
-						ch.Info("converted using fallback encoder: %s", enc)
-						goto converted
-					}
-					ch.Error(
-						"fallback convert with %s failed: %s (%s)",
-						enc,
-						runErr.Error(),
-						strings.TrimSpace(attemptStderr.String()),
-					)
-				}
+			var fallbackStderr bytes.Buffer
+			fallback := ffmpegCommand(ctx, "ffmpeg", "-y", "-i", tsPath, "-c", "copy", mp4Path)
+			fallback.Stderr = &fallbackStderr
+			if runErr := runCmdWithContext(ctx, fallback); runErr == nil {
+				ch.Info("converted using stream copy fallback")
+				goto converted
+			} else if ctx.Err() != nil {
+				ch.Info("mp4 conversion cancelled: %s", filepath.Base(tsPath))
+				return
+			} else {
+				ch.Error("fallback stream copy failed: %s (%s)", runErr.Error(), strings.TrimSpace(fallbackStderr.String()))
 			}
 		}
 		ch.Error("convert to mp4 failed: %s (%s)", err.Error(), trimmed)
