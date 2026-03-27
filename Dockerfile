@@ -4,7 +4,7 @@ WORKDIR /workspace
 COPY ./ ./
 RUN go build -o chaturbate-dvr .
 
-FROM alpine:3.20 AS runnable
+FROM alpine:latest AS runnable
 WORKDIR /usr/src/app
 
 RUN apk add --no-cache \
