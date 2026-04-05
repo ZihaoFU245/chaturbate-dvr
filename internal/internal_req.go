@@ -71,10 +71,6 @@ func (h *Req) GetBytes(ctx context.Context, url string) ([]byte, error) {
 	if strings.Contains(string(b), "<title>Just a moment...</title>") {
 		return nil, ErrCloudflareBlocked
 	}
-	// Check for Age Verification
-	if strings.Contains(string(b), "Verify your age") {
-		return nil, ErrAgeVerification
-	}
 
 	if resp.StatusCode == http.StatusForbidden {
 		return nil, fmt.Errorf("forbidden: %w", ErrPrivateStream)
@@ -97,7 +93,7 @@ func CreateRequest(ctx context.Context, url string) (*http.Request, context.Canc
 
 // SetRequestHeaders applies necessary headers to the request.
 func SetRequestHeaders(req *http.Request) {
-	req.Header.Set("X-Requested-With", "XMLHttpRequest") // So Cloudflare would likely accept the request, and no Age Verification
+	req.Header.Set("X-Requested-With", "XMLHttpRequest")
 
 	if server.Config.UserAgent != "" {
 		req.Header.Set("User-Agent", server.Config.UserAgent)

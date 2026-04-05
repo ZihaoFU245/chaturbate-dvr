@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"regexp"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -17,8 +17,7 @@ import (
 	"github.com/zihaofu245/chaturbate-dvr/server"
 )
 
-// roomDossierRegexp is used to extract the room dossier information from the HTML response.
-var roomDossierRegexp = regexp.MustCompile(`window\.initialRoomDossier = "(.*?)"`)
+const roomDossierMarker = "window.initialRoomDossier"
 
 // Client represents an API client for interacting with Chaturbate.
 type Client struct {
@@ -44,36 +43,140 @@ func FetchStream(ctx context.Context, client *internal.Req, username string) (*S
 		return nil, fmt.Errorf("failed to get page body: %w", err)
 	}
 
-	// Ensure that the playlist.m3u8 file is present in the response
-	if !strings.Contains(body, "playlist.m3u8") {
-		return nil, internal.ErrChannelOffline
-	}
-
 	return ParseStream(body)
 }
 
 // ParseStream extracts the HLS source URL from the given page body.
 func ParseStream(body string) (*Stream, error) {
-	matches := roomDossierRegexp.FindStringSubmatch(body)
-	if len(matches) == 0 {
-		return nil, errors.New("room dossier not found")
-	}
-
-	// Decode Unicode escape sequences in the extracted JSON string
-	sourceData, err := strconv.Unquote(strings.Replace(strconv.Quote(matches[1]), `\\u`, `\u`, -1))
+	sourceData, err := extractRoomDossier(body)
 	if err != nil {
-		return nil, fmt.Errorf("failed to decode unicode: %w", err)
+		return nil, err
 	}
 
-	// Unmarshal JSON to extract HLS source URL
 	var room struct {
-		HLSSource string `json:"hls_source"`
+		RoomStatus string `json:"room_status"`
+		HLSSource  string `json:"hls_source"`
 	}
 	if err := json.Unmarshal([]byte(sourceData), &room); err != nil {
 		return nil, fmt.Errorf("failed to parse JSON: %w", err)
 	}
+	if room.RoomStatus == "offline" {
+		return nil, internal.ErrChannelOffline
+	}
+	if room.RoomStatus != "" && room.RoomStatus != "public" {
+		return nil, internal.ErrPrivateStream
+	}
+	if room.HLSSource == "" {
+		return nil, internal.ErrChannelOffline
+	}
 
 	return &Stream{HLSSource: room.HLSSource}, nil
+}
+
+func extractRoomDossier(body string) (string, error) {
+	idx := strings.Index(body, roomDossierMarker)
+	if idx == -1 {
+		return "", internal.ErrChannelOffline
+	}
+
+	assignment := body[idx+len(roomDossierMarker):]
+	eq := strings.IndexByte(assignment, '=')
+	if eq == -1 {
+		return "", errors.New("room dossier assignment not found")
+	}
+
+	value := strings.TrimSpace(assignment[eq+1:])
+	if value == "" {
+		return "", errors.New("room dossier value is empty")
+	}
+
+	switch value[0] {
+	case '"', '\'':
+		decoded, err := parseQuotedAssignment(value)
+		if err != nil {
+			return "", fmt.Errorf("parse room dossier string: %w", err)
+		}
+		return decoded, nil
+	case '{':
+		decoded, err := parseJSONObject(value)
+		if err != nil {
+			return "", fmt.Errorf("parse room dossier object: %w", err)
+		}
+		return decoded, nil
+	default:
+		return "", fmt.Errorf("unsupported room dossier format: %q", value[0])
+	}
+}
+
+func parseQuotedAssignment(value string) (string, error) {
+	quote := value[0]
+	escaped := false
+	for i := 1; i < len(value); i++ {
+		if escaped {
+			escaped = false
+			continue
+		}
+		if value[i] == '\\' {
+			escaped = true
+			continue
+		}
+		if value[i] != quote {
+			continue
+		}
+
+		literal := value[:i+1]
+		if quote == '\'' {
+			literal = `"` + strings.ReplaceAll(literal[1:len(literal)-1], `"`, `\\"`) + `"`
+		}
+
+		decoded, err := strconv.Unquote(literal)
+		if err != nil {
+			return "", err
+		}
+		return decoded, nil
+	}
+
+	return "", errors.New("unterminated quoted value")
+}
+
+func parseJSONObject(value string) (string, error) {
+	depth := 0
+	inString := false
+	escaped := false
+	var quote byte
+
+	for i := 0; i < len(value); i++ {
+		ch := value[i]
+		if inString {
+			if escaped {
+				escaped = false
+				continue
+			}
+			if ch == '\\' {
+				escaped = true
+				continue
+			}
+			if ch == quote {
+				inString = false
+			}
+			continue
+		}
+
+		switch ch {
+		case '"', '\'':
+			inString = true
+			quote = ch
+		case '{':
+			depth++
+		case '}':
+			depth--
+			if depth == 0 {
+				return value[:i+1], nil
+			}
+		}
+	}
+
+	return "", errors.New("unterminated JSON object")
 }
 
 // Stream represents an HLS stream source.
@@ -164,6 +267,11 @@ func PickPlaylist(masterPlaylist *m3u8.MasterPlaylist, baseURL string, resolutio
 		variant = lo.MaxBy(candidates, func(a, b *Resolution) bool {
 			return a.Width > b.Width
 		})
+		if variant == nil {
+			variant = lo.MinBy(lo.Values(resolutions), func(a, b *Resolution) bool {
+				return a.Width < b.Width
+			})
+		}
 	}
 	if variant == nil {
 		return nil, fmt.Errorf("resolution not found")
@@ -183,12 +291,50 @@ func PickPlaylist(masterPlaylist *m3u8.MasterPlaylist, baseURL string, resolutio
 		}
 	}
 
+	resolvedPlaylistURL, err := resolveURL(baseURL, playlistURL)
+	if err != nil {
+		return nil, fmt.Errorf("resolve playlist url: %w", err)
+	}
+	rootURL, err := parentURL(resolvedPlaylistURL)
+	if err != nil {
+		return nil, fmt.Errorf("resolve segment root url: %w", err)
+	}
+
 	return &Playlist{
-		PlaylistURL: strings.TrimSuffix(baseURL, "playlist.m3u8") + playlistURL,
-		RootURL:     strings.TrimSuffix(baseURL, "playlist.m3u8"),
+		PlaylistURL: resolvedPlaylistURL,
+		RootURL:     rootURL,
 		Resolution:  finalResolution,
 		Framerate:   finalFramerate,
 	}, nil
+}
+
+func resolveURL(baseURL, ref string) (string, error) {
+	base, err := url.Parse(baseURL)
+	if err != nil {
+		return "", err
+	}
+	resolved, err := base.Parse(ref)
+	if err != nil {
+		return "", err
+	}
+	return resolved.String(), nil
+}
+
+func parentURL(raw string) (string, error) {
+	parsed, err := url.Parse(raw)
+	if err != nil {
+		return "", err
+	}
+	parsed.RawQuery = ""
+	parsed.Fragment = ""
+	path := parsed.Path
+	idx := strings.LastIndex(path, "/")
+	if idx == -1 {
+		parsed.Path = ""
+		return parsed.String(), nil
+	}
+	parsed.Path = path[:idx+1]
+	return parsed.String(), nil
 }
 
 // WatchHandler is a function type that processes video segments.
@@ -197,8 +343,10 @@ type WatchHandler func(b []byte, duration float64) error
 // WatchSegments continuously fetches and processes video segments.
 func (p *Playlist) WatchSegments(ctx context.Context, handler WatchHandler) error {
 	var (
-		client  = internal.NewReq()
-		lastSeq = -1
+		client      = internal.NewReq()
+		lastSeq     uint64
+		hasLastSeq  bool
+		lastMapSpec string
 	)
 
 	for {
@@ -217,19 +365,50 @@ func (p *Playlist) WatchSegments(ctx context.Context, handler WatchHandler) erro
 		}
 
 		// Process new segments
-		for _, v := range playlist.Segments {
+		for i, v := range playlist.Segments {
 			if v == nil {
 				continue
 			}
-			seq := internal.SegmentSeq(v.URI)
-			if seq == -1 || seq <= lastSeq {
+			seq := v.SeqId
+			if seq == 0 {
+				seq = playlist.SeqNo + uint64(i)
+			}
+			if hasLastSeq && seq <= lastSeq {
 				continue
 			}
+
+			segmentMap := playlist.Map
+			if v.Map != nil {
+				segmentMap = v.Map
+			}
+			if segmentMap != nil {
+				mapSpec := fmt.Sprintf("%s:%d:%d", segmentMap.URI, segmentMap.Offset, segmentMap.Limit)
+				if mapSpec != lastMapSpec {
+					mapURL, err := resolveURL(p.RootURL, segmentMap.URI)
+					if err != nil {
+						return fmt.Errorf("resolve init segment url: %w", err)
+					}
+					initData, err := client.GetBytes(ctx, mapURL)
+					if err != nil {
+						return fmt.Errorf("get init segment: %w", err)
+					}
+					if err := handler(initData, 0); err != nil {
+						return fmt.Errorf("handle init segment: %w", err)
+					}
+					lastMapSpec = mapSpec
+				}
+			}
+
 			lastSeq = seq
+			hasLastSeq = true
 
 			// Fetch segment data with retry mechanism
 			pipeline := func() ([]byte, error) {
-				return client.GetBytes(ctx, fmt.Sprintf("%s%s", p.RootURL, v.URI))
+				segmentURL, err := resolveURL(p.RootURL, v.URI)
+				if err != nil {
+					return nil, fmt.Errorf("resolve segment url: %w", err)
+				}
+				return client.GetBytes(ctx, segmentURL)
 			}
 
 			resp, err := retry.DoWithData(
